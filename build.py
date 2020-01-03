@@ -4,6 +4,8 @@ u"""
 Pack files into NetProphet2.tar.gz
 """
 import os
+from subprocess import check_call
+
 import patoolib
 
 FILE = "NetProphet2.tar.gz"
@@ -28,6 +30,7 @@ def main():
             
     patoolib.create_archive(FILE, tasks)
 
+    check_call("docker build -t ygidtu/netprophet2 .", shell=True)
 
 if __name__ == '__main__':
     main()
