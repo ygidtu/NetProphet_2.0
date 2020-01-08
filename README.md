@@ -2,31 +2,16 @@
 
 - [NetProphet 2.0 github](https://github.com/yiming-kang/NetProphet_2.0)
 - [current github](https://github.com/ygidtu/NetProphet_2.0)
-- [dockerhub](https://hub.docker.com/repository/docker/ygidtu/netprophet2)
+- [Docker hub](https://hub.docker.com/repository/docker/ygidtu/netprophet2)
 
-
-## Tests
-```bash
-docker run -d -t --name net_test \
-    -v /mnt/raid61/Personal_data/zhangyiming/software/NETPROPHET2_docker:/root \
-    ubuntu:16.04 /bin/bash
-    
-docker exec net_test bash
-```
 
 ## Installation
 
 ###  From source
 
 ```bash
-pip3 install patool
-
-# change patool header from
-# #!/usr/bin/python
-# To
-# #!/usr/bin/env python3
-
-python3 build.py
+git clone https://github.com/ygidtu/NetProphet_2.0.git
+docker build -t ygidtu/netprophet2 .
 ```
 
 ### From docker image
