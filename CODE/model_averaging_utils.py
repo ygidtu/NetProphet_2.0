@@ -1,13 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 import sys
-import os
-import argparse
 import numpy as nmp
 import operator
+from functools import reduce
+
 
 """
 An importable file to provide utilities for model averaging in netprophet.
 """
+
+
 def resort_by_weights(M, W):
     """ For all edges in M that have a corresponding edge in W,
     resort those edges in-place by their new score, M_ij*W_ij. 
@@ -32,7 +34,8 @@ def resort_by_weights(M, W):
         # working_net[j, i] = orig_values[n]*orig_signs[n]
     # working_net[W_avail] = working_net[W_avail]*orig_signs
     return working_net
-    
+
+
 def resort_by_pwm(network, pwm_net):
     """ """
     pwm_avail = nmp.sum(pwm_net, 1) > 0
@@ -58,18 +61,18 @@ def resort_by_pwm(network, pwm_net):
         # working_net[j, i] = orig_values[n]*orig_signs[n]
     # working_net[pwm_avail] = working_net[pwm_avail]*orig_signs
     return working_net
-            
-#end function
+
 
 def list_geometric(ls):
     """ Returns the geometric mean of a list."""
     return reduce(operator.mul, ls)**(1.0/len(ls))
 
+
 def rescale_matrix(mtr):
     ''' Given a matrix of float values, rescales it so the largest absolute
     value in the matrix is 1.'''
     return mtr/nmp.max(nmp.abs(mtr))
-#end function
+
 
 def rescale_shift_matrix(mtr):
     ''' Given a matrix of float values, shifts and rescales it so that the
@@ -82,7 +85,7 @@ def rescale_shift_matrix(mtr):
     least_pos = nmp.min(mtr_cp[mtr_cp>0]) if nmp.any(mtr_cp>0) else 0
     mtr_cp[mtr_cp>0]-=least_pos
     return rescale_matrix(mtr_cp)
-#end function
+
 
 def quadrant_combine(lasso_score, de_score, constants):
     ''' Returns a score for an edge based on its lasso score, de score, 
@@ -106,7 +109,6 @@ def quadrant_combine(lasso_score, de_score, constants):
     elif lasso_score ==0 and de_score != 0:
         w_f = constants["D"]
     return (nmp.abs(lasso_score) + cb_f) * (nmp.abs(de_score) + cd_f) * w_f
-#end function
 
 
 def model_average_pwm_geometric(np_component, binding_strengths):
@@ -119,7 +121,6 @@ def model_average_pwm_geometric(np_component, binding_strengths):
     pwm_averaged_nan_index = nmp.where(nmp.isnan(pwm_averaged))
     pwm_averaged[pwm_averaged_nan_index[0], pwm_averaged_nan_index[1]] = 0
     return pwm_averaged
-#end function
 
 
 def model_average_pwm_arithmetic(np_component, binding_strengths):
@@ -129,9 +130,7 @@ def model_average_pwm_arithmetic(np_component, binding_strengths):
     abs_np_component = nmp.absolute(np_component)
     abs_binding_strengths = nmp.absolute(binding_strengths)
     combined = (abs_np_component + abs_binding_strengths)/2
-    combined = nmp.multiply(combined, sign_np_component) 
-    return combined
-#end function
+    return nmp.multiply(combined, sign_np_component)
 
 
 def model_average_pwm_arithmetic_intersect(np_component, binding_strengths):
@@ -143,17 +142,21 @@ def model_average_pwm_arithmetic_intersect(np_component, binding_strengths):
     inds_intersect = nmp.nonzero(nmp.multiply(abs_np_component, abs_binding_strengths))
     combined = nmp.maximum(abs_np_component, abs_binding_strengths)
     combined[inds_intersect] = (abs_np_component[inds_intersect] + abs_binding_strengths[inds_intersect]) /2
-    combined = nmp.multiply(combined, sign_np_component) 
-    return combined
-#end function
+    return nmp.multiply(combined, sign_np_component)
 
 
 def model_average_np(lasso_component, de_component, 
-                     constants = {"quadrant I":3, "quadrant II":1, 
-                                  "quadrant III":1, "quadrant IV":1,
-                                  "B":1, "D":2,
-                                  "Cb":0.1, "Cd":0.01}):
+                     constants = None):
     ''' Performs model averaging as in netprophet. '''
+    # modified at 2020.01.06
+    if constants is None:
+        constants = {
+            "quadrant I": 3, "quadrant II": 1,
+            "quadrant III": 1, "quadrant IV": 1,
+            "B": 1, "D": 2,
+            "Cb": 0.1, "Cd": 0.01
+        }
+
     betas = rescale_matrix(lasso_component)
     de = rescale_shift_matrix(de_component)
     retval = nmp.zeros(nmp.shape(lasso_component))
@@ -165,7 +168,6 @@ def model_average_np(lasso_component, de_component,
                                             de[j,i],
                                             constants) 
     return retval
-#end function
 
 
 if __name__ == "__main__":

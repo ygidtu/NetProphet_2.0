@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
@@ -7,13 +7,14 @@ import operator
 import glob
 import os.path
 
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description=
         "Discretize continuous NetProphet scores into specific number of equal-value-range bins, along with a bin of all zeros.")
     parser.add_argument('-i', '--dir_input', dest='dir_input', type=str)
     parser.add_argument('-n', '--num_bin', dest='num_bin', type=int, default=20)
     parser.add_argument('-o', '--dir_output', dest='dir_output', type=str)
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
 
@@ -33,10 +34,10 @@ def process_score(fi, fo, num_bin):
     lines = open(fi).readlines()
     for i, line in enumerate(lines):
         if i > 0 and line.strip():
-            line_split = line.split();
+            line_split = line.split()
             dict_target[line_split[0]] = float(line_split[1])
     # sort dictionary based on score
-    dict_target_sorted = sorted(dict_target.iteritems(), key=operator.itemgetter(1))
+    dict_target_sorted = sorted(dict_target.items(), key=operator.itemgetter(1))
     dict_target_sorted.reverse()
 
     # get score intervals
@@ -80,5 +81,6 @@ def main(argv):
         process_score(fn, parsed.dir_output + tf, parsed.num_bin)
 
 
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

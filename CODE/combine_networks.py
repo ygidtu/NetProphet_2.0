@@ -2,8 +2,11 @@
 import sys
 import os
 import argparse
-from model_averaging_utils import *
+import logging
+
 import numpy as nmp
+
+from CODE.model_averaging_utils import *
 
 
 """
@@ -19,6 +22,7 @@ averaging_strategies = {'NP':model_average_np,
                         'arithmetic_intersect':model_average_pwm_arithmetic_intersect,
                         'resort':resort_by_weights}
 
+
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="")
     parser.add_argument('-l','--lasso_component', dest='lasso_component')
@@ -33,12 +37,14 @@ def parse_args(argv):
     parser.add_argument('-g','--target_names', dest='target_names')
     parser.add_argument('-s','--strategy', dest='strategy', default='NP',
                         help='options: %s'%str(averaging_strategies.keys()))
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
+
 
 def output(result):
     """ Write the results out the stdout. """
     pass
+
 
 def main(argv):
     """ The main module should take in inputs from the command line, 
@@ -60,7 +66,7 @@ def main(argv):
     # read in output directory
     if (not is_np_net):
 
-        sys.stderr.write("Reading input arguments ... ")
+        logging.info("Reading input arguments ... ")
 
         # read in LASSO values
         lasso_component = nmp.loadtxt(parsed.lasso_component)
@@ -89,7 +95,7 @@ def main(argv):
             # # read in list of target gene names
             # target_names = [row.strip() for row in open(parsed.target_names)]
 
-        sys.stderr.write("Done\nCombining with motif network ... ")
+        logging.info("Done\nCombining with motif network ... ")
         
         # perform model averaging
         if parsed.strategy == 'NP':
@@ -98,11 +104,11 @@ def main(argv):
             np_component = model_average_np(lasso_component, de_component)
             combined = averaging_strategies[parsed.strategy](np_component, binding_strengths)
 
-        sys.stderr.write("Done\n")
+        logging.info("Done\n")
 
     else:
 
-        sys.stderr.write("Reading input arguments ... ")
+        logging.info("Reading input arguments ... ")
 
         # read in np values
         np_component = nmp.loadtxt(parsed.np_component)
@@ -125,7 +131,7 @@ def main(argv):
             output_adjlst_name = os.path.join(parsed.output_dir,
                                               parsed.output_adjlst_name)
 
-        sys.stderr.write("Done\nCombining with motif network ... ")
+        logging.info("Done\nCombining with motif network ... ")
         
         # perform model averaging
         if parsed.strategy == 'NP':
@@ -133,14 +139,14 @@ def main(argv):
         else:
             combined = averaging_strategies[parsed.strategy](np_component,binding_strengths)
 
-        sys.stderr.write("Done\n")
+        logging.info("Done\n")
     
     # if args provided, write out combined lists as an adjacency list
-    sys.stderr.write("Writing adjmtr file ... ")
+    logging.info("Writing adjmtr file ... ")
     # nmp.savetxt(output_adjmtr_name, combined)
     write_adjmtr(output_adjmtr_name, combined)
-    sys.stderr.write("Done\n")
-#end function
+    logging.info("Done\n")
+
 
 def write_adjmtr(fn, adjmtr):
     writer = open(fn, "w")
@@ -153,5 +159,6 @@ def write_adjmtr(fn, adjmtr):
         writer.write("\n")
     writer.close()
 
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

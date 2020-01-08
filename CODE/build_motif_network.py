@@ -2,6 +2,8 @@
 import sys
 import argparse
 import os.path
+import logging
+
 import numpy as np
 from scipy.stats.mstats import gmean
 
@@ -16,7 +18,7 @@ def parse_args(argv):
     parser.add_argument('-s', '--summary_suffix', dest='summary_suffix', type=str, default=".summary")
     parser.add_argument('-t', '--thld_type', dest='thld_type', type=str)
     parser.add_argument('-v', '--thld_val', dest='thld_val', type=float, default=0)
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
 
@@ -116,13 +118,13 @@ def main(argv):
             sys.exit("No confidence threshold to filter motifs.\n")
 
     ## build network
-    sys.stdout.write("Building motif network ... ")
+    logging.info("Building motif network ... ")
     network = build_network(parsed.fn_rids, parsed.fn_gids, parsed.fn_inferred, parsed.dir_fimo, parsed.summary_suffix, parsed.thld_type, parsed.thld_val)
     # write adjmtr file
-    sys.stdout.write("DONE\nWriting network ... ")
+    logging.info("DONE\nWriting network ... ")
     write_adjmtr(network, parsed.fn_adjmtr)
-    sys.stdout.write("DONE\n")
+    logging.info("DONE\n")
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

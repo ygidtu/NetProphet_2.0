@@ -1,11 +1,15 @@
-#!/usr/bin/ python
+#!/usr/bin/env python3
 import sys
 import os
 import glob
 import argparse
+import logging
+
 import numpy as np
 
+
 dbds_formats = ['multi_dbds', 'single_dbds']
+
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Merge TF network scores by weighted averaging, where the weight uses DBD-PWM similarity fit.")
@@ -17,7 +21,7 @@ def parse_args(argv):
     parser.add_argument("-t", "--fn_dbd2rids_conversion", dest="fn_dbd2rids_conversion")
     parser.add_argument("-p", "--fn_pertrubed_rids", dest="fn_pertrubed_rids")
     parser.add_argument("-o", "--fn_output", dest="fn_output")
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
 
@@ -32,7 +36,7 @@ def write_adjmtr(fn, adjmtr):
             if adjmtr[i,j] == 0:
                 writer.write("0\t")
             else:
-                writer.write("%0.10f\t" % adjmtr[i,j])
+                writer.write("%0.10f\t" % adjmtr[i, j])
         writer.write("\n")
     writer.close()
 
@@ -40,38 +44,43 @@ def write_adjmtr(fn, adjmtr):
 def get_regulators(fn_rids, fn_pert_rids):    
     rids = np.loadtxt(fn_rids, dtype=str)
     pert_rids = np.intersect1d(rids, np.loadtxt(fn_pert_rids, dtype=str)) if fn_pert_rids is not None else None
-    return (rids, pert_rids)
+    return rids, pert_rids
 
 
 def get_tf_weights_multi_dbds(dir_dbd, dbd_cutoff, fn_conv):
-    ## parse tf-dbd conversion
+
+    # parse tf-dbd conversion
     dbd2rid_list = np.loadtxt(fn_conv, dtype=str)
     dbd2rid_dict = {}
     for i in range(len(dbd2rid_list)):
         dbd2rid_dict[dbd2rid_list[i][0]] = dbd2rid_list[i][1]
-    ## loop thru dbd similarity files
+
+    # loop thru dbd similarity files
     tf_simscore_dict = {}
     for fn_dbd in glob.glob(dir_dbd + "*"):
         query_dbd = os.path.basename(fn_dbd)
         query_tf = dbd2rid_dict[query_dbd]
         if query_tf not in tf_simscore_dict.keys():
             tf_simscore_dict[query_tf] = {}
-        ## get similarity scores 
+
+        # get similarity scores
         f = open(fn_dbd, "r")
         lines = f.readlines()
         f.close()
         for i in range(len(lines)):
             paired_tf = dbd2rid_dict[lines[i].split()[0]]
             paired_pctid = float(lines[i].split()[1])
-            ## store all scores
+
+            # store all scores
             if paired_tf not in tf_simscore_dict[query_tf].keys():
                 tf_simscore_dict[query_tf][paired_tf] = []
             tf_simscore_dict[query_tf][paired_tf].append(paired_pctid)
-    ## use max tf similarity from multiple dbds to compute weights
+
+    # use max tf similarity from multiple dbds to compute weights
     tf_weight_dict = {}
     for query_tf in tf_simscore_dict.keys():
         tf_weight_dict[query_tf] = {}
-        for paired_tf, scores in tf_simscore_dict[query_tf].iteritems():
+        for paired_tf, scores in tf_simscore_dict[query_tf].items():
             scores = scores[scores >= dbd_cutoff]
             if len(scores) > 0:
                 tf_weight_dict[query_tf][paired_tf] = sigmoid(max(scores))
@@ -79,25 +88,27 @@ def get_tf_weights_multi_dbds(dir_dbd, dbd_cutoff, fn_conv):
 
 
 def get_tf_weights(dir_dbd, dbd_cutoff):
-    ## loop thru dbd similarity files
+    # loop thru dbd similarity files
     tf_simscore_dict = {}
     for fn_tf in glob.glob(dir_dbd + "*"):
         query_tf = os.path.basename(fn_tf)
         tf_simscore_dict[query_tf] = {}
-        ## get similarity scores 
+
+        # get similarity scores
         f = open(fn_tf, "r")
         lines = f.readlines()
         f.close()
         for i in range(len(lines)):
             paired_tf = lines[i].split()[0]
             paired_pctid = float(lines[i].split()[1])
-            ## store score
+            # store score
             tf_simscore_dict[query_tf][paired_tf] = paired_pctid
-    ## use max tf similarity from multiple dbds to compute weights
+
+    # use max tf similarity from multiple dbds to compute weights
     tf_weight_dict = {}
     for query_tf in tf_simscore_dict.keys():
         tf_weight_dict[query_tf] = {}
-        for paired_tf, score in tf_simscore_dict[query_tf].iteritems():
+        for paired_tf, score in tf_simscore_dict[query_tf].items():
             if score >= dbd_cutoff:
                 tf_weight_dict[query_tf][paired_tf] = sigmoid(score)
     return tf_weight_dict
@@ -112,16 +123,19 @@ def update_tf_weights(tf_weight_dict, pert_rids):
 
 
 def average_scores(network_input, tf_weight_dict, rids):
-    network_output = np.zeros(network_input.shape) 
+    network_output = np.zeros(network_input.shape)
+    print(network_input.shape)
     # weighted average
     for query_tf in rids:
         query_indx = np.where(rids == query_tf)[0][0]
-        if (not query_tf in tf_weight_dict.keys()) or (len(tf_weight_dict[query_tf].keys()) < 2):
-            ## unchanged score if query tf does not have other similar tfs
+        if query_tf not in tf_weight_dict.keys() or len(tf_weight_dict[query_tf].keys()) < 2:
+
+            # unchanged score if query tf does not have other similar tfs
             network_output[query_indx, :] = network_input[query_indx, :]
         else:
-            ## use allowed tfs 
-            allowed_rids = np.intersect1d(tf_weight_dict[query_tf].keys(), rids)
+
+            # use allowed tfs
+            allowed_rids = np.intersect1d(list(tf_weight_dict[query_tf].keys()), rids)
             if len(allowed_rids) == 0:
                 network_output[query_indx, :] = network_input[query_indx, :]
             else:
@@ -130,10 +144,12 @@ def average_scores(network_input, tf_weight_dict, rids):
                 for paired_tf in allowed_rids:
                     paired_tf_indices.append(np.where(rids == paired_tf)[0][0])
                     paired_tf_weights.append(tf_weight_dict[query_tf][paired_tf])
+
                 # compute weighted average
                 paired_tf_weights = np.array(paired_tf_weights)
                 paired_tf_weights /= np.sum(paired_tf_weights)
-                ## update the subnetwork
+
+                # update the subnetwork
                 network_sub = network_input[paired_tf_indices, :]
                 network_output[query_indx, :] = np.dot(paired_tf_weights,  network_sub)
     return network_output
@@ -143,11 +159,11 @@ def main(argv):
     parsed = parse_args(argv)
     parsed.dir_aligned_dbd += "" if parsed.dir_aligned_dbd.endswith("/") else "/"
 
-    ## get regualtor list
+    # get regulator list
     rids, pert_rids = get_regulators(parsed.fn_rids, parsed.fn_pertrubed_rids)
 
     # parse dbd percent identity and compute weights from sigmoid fit
-    sys.stdout.write("Computing TF weights ... ")
+    logging.info("Computing TF weights ... ")
     if parsed.dbds_formats.lower() == "multi_dbds":
         if parsed.fn_dbd2rids_conversion is None:
             sys.exit("ERROR: DBD to TF conversion file must be provided if multi_dbds is used.")
@@ -156,29 +172,29 @@ def main(argv):
         tf_weight_dict = get_tf_weights(parsed.dir_aligned_dbd, parsed.dbd_cutoff)
     else:
         sys.exit("ERROR: Improper DBD alignment score format.")
-    sys.stdout.write("DONE\n")
+    logging.info("DONE\n")
 
     # filter the weights for perturbed tfs only
     if pert_rids:
-        sys.stdout.write("Recomputing TF weights for perturbed ones only ... ")
+        logging.info("Recomputing TF weights for perturbed ones only ... ")
         update_tf_weights(tf_weight_dict, pert_rids)
-        sys.stdout.write("DONE\n")
+        logging.info("DONE\n")
 
     # load network
-    sys.stdout.write("Loading network ... ")
+    logging.info("Loading network ... ")
     network_input = np.loadtxt(parsed.fn_adjmtr_network)
-    sys.stdout.write("DONE\n")
+    logging.info("DONE\n")
 
     # merge similar tfs using weighted average
-    sys.stdout.write("Weighted averaging similar TFs ... ")
+    logging.info("Weighted averaging similar TFs ... ")
     network_output = average_scores(network_input, tf_weight_dict, rids)
-    sys.stdout.write("DONE\n")
+    logging.info("DONE\n")
 
     # write weighted average network
-    sys.stdout.write("Writing network ... ")
+    logging.info("Writing network ... ")
     write_adjmtr(parsed.fn_output, network_output)
-    sys.stdout.write("DONE\n")
+    logging.info("DONE\n")
 
 
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

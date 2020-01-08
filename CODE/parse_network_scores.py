@@ -4,7 +4,8 @@ import sys
 import os
 import argparse
 import numpy
-from scipy.stats import rankdata
+import logging
+
 
 def parse_args(argv):
     ''' A method for taking in command line arguments and specifying
@@ -14,11 +15,13 @@ def parse_args(argv):
     parser.add_argument('-r', '--regulator', dest='regulator', type=str)
     parser.add_argument('-t', '--target', dest='target', type=str)
     parser.add_argument('-o', '--dir_output', dest='dir_output', type=str)
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
+
 def errprint(st):
-    sys.stderr.write(st + "\n")
+    logging.ERROR(st + "\n")
+
 
 def main(argv):
     parsed = parse_args(argv)
@@ -40,6 +43,7 @@ def main(argv):
                 writer.write("%s\t%0.17f\n" % (targets[j], adjmtr[i, j]))
         writer.close()
 
+
 def check_dir(fd):
     if not fd.endswith('/'):
         fd += '/'
@@ -47,5 +51,6 @@ def check_dir(fd):
         os.makedirs(fd)
     return fd
 
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

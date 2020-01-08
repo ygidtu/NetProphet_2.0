@@ -5,6 +5,15 @@
 - [dockerhub](https://hub.docker.com/repository/docker/ygidtu/netprophet2)
 
 
+## Tests
+```bash
+docker run -d -t --name net_test \
+    -v /mnt/raid61/Personal_data/zhangyiming/software/NETPROPHET2_docker:/root \
+    ubuntu:16.04 /bin/bash
+    
+docker exec net_test bash
+```
+
 ## Installation
 
 ###  From source
@@ -38,31 +47,34 @@ docker pull ygidtu/netprophet2
     - [link](https://download.open-mpi.org/release/open-mpi/v1.8/openmpi-1.8.8.tar.gz)
 
 ### Current in docker image
-
 - Software version
     - R 3.2.3
-    - Python 3.5
-    - Python 2.7
-        - numpy 1.14.0
-        - scipy 1.2.2
+    - Python 3.7.4 (Miniconda 4.7.12.1)   
     - R 
+        - doMC (do parallel calculation without OpenMpi and Slurm)
+        - BayesTree
+        - lars
         - matrixStats
         - R.oo
         - abind
-    - Rest using the source code from SRC directory
+    - FIRE-1.1a: from SRC directory
+    - meme_4.9.1: from SRC directory
 
-- Entry point replace the NetProphet2 script with main.py
+- Entry point replace the NetProphet2 script with `main.py`
 - Switch the python scripts to using python3 (due to python2 is not longer maintained)
+- Bash, sed and gawk is replace by `main.py`
+
+> I'm not familiar with FIRE and MEME, therefore didn't replace these two with newer version.
 
 ### New files compare to original repo
 
 - NetProphet_2.0-master-cad8020.zip: is the latest repo of NetProphet (2019-01-03)
 - NetProphet2.tar.gz is the package of this repo
 - build.py is a script that used to pack the data and build docker image
-- main.py is the entry point of docker image
-- SRC/numpy-1.14.0.tar.gz, SRC/scipy-1.2.2.tar.gz is the source code of python numpy and scipy
-- SRC/slurm-slurm-15-08-7-1.tar.gz: source code
-- SRC/openmpi-1.8.8.tar.gz: source code
+- main.py is the entry point of docker image, 
+    this script replaced the snakemake file and bash scripts under `./CODE` 
+    to better handle the program error and parallel calculation 
+
 
 ## Usage
 

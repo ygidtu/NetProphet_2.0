@@ -1,11 +1,16 @@
-if (!require("R.oo")) try(install.packages("R.oo"));
-if (!require("Rmpi")) try(install.packages("Rmpi"));
-if (!require("BayesTree")) try(install.packages("BayesTree"));
-if (!require("stats")) try(install.packages("stats"));
-if (!require("matrixStats")) try(install.packages("matrixStats"));
-if (!require("Matrix")) try(install.packages("Matrix"));
-if (!require("abind")) try(install.packages("abind"));
-# if (!require("restorepoint")) try(install.packages("restorepoint")); ## deprecated
+load_packages <- function() {
+	if (!require("R.oo")) try(install.packages("R.oo"));
+	if (!require("doMC")) try(install.packages("doMC"));
+	if (!require("BayesTree")) try(install.packages("BayesTree"));
+	if (!require("stats")) try(install.packages("stats"));
+	if (!require("matrixStats")) try(install.packages("matrixStats"));
+	if (!require("Matrix")) try(install.packages("Matrix"));
+	if (!require("abind")) try(install.packages("abind"));
+	# if (!require("restorepoint")) try(install.packages("restorepoint")); ## deprecated
+}
+
+suppressMessages(load_packages())
+
 
 getBartNetwork <- function(tgtLevel, tfLevel, regMat, unperturbedTfLevel, nBin = 3, ...) {
 	# use BART to generate a network structure prediction
@@ -97,7 +102,7 @@ bartExpr <- function(tgtLevel, tfLevel, testTfLevel, regMat, verbose = TRUE, noi
 	result;
 }
 
-bartMultiresponse <- function(x.train, y.train, x.test = NULL, allowed, simplify = TRUE, verbose = TRUE, mpiComm, blockSize, saveTo, ...) {
+bartMultiresponse <- function(x.train, y.train, x.test = NULL, allowed, simplify = TRUE, verbose = TRUE, blockSize, saveTo=NULL, ...) {
 	# wrapper for using bart on multiple responses, able to invoke mpi
 	# allowed: matrix whose ij entry tells if explanatory variable i should be used for response j; by default, if variables names are given in the colnames of x.train and y.train, every explanatory relation is allowed except for a variable explaining itself
 	# mpiComm: missing or integer; if specified, will invoke mpi on the given comm number mpiComm (see package Rmpi for details)
@@ -132,38 +137,18 @@ bartMultiresponse <- function(x.train, y.train, x.test = NULL, allowed, simplify
 		);
 	}
 	#
-	if (missing(mpiComm) || is.null(mpiComm)) { # calculate without invoking mpi
-		for (i in sequence(nResponse)) {
-			if (verbose) print(paste(i, "/", nResponse, responseName[i]));
-			bartedList[[responseName[i]]] <- try(applicand(i, simplify = simplify, verbose = pmax(verbose - 1, 0), ...));
-			if (!missing(saveTo) && !is.null(saveTo)) save(bartedList, file = saveTo);
-		}
-	} else { # calculate with mpi
-		require("Rmpi");
-		# try(Sys.setenv(OMPI_MCA_btl_tcp_if_include="eth0"));
-		if (mpi.comm.size(comm = mpiComm) == 0) { # initialize mpi comm if have not done so yet
-			if (missing(blockSize)) blockSize <- floor(sqrt(nResponse));
-			mpi.spawn.Rslaves(nslaves = blockSize, comm = mpiComm);
-		}
-		nBlock <- ceiling(nResponse / blockSize);
-		blockLabel <- head(rep(seq(nBlock), each = blockSize), nResponse);
-		blockIxList <- split(seq(nResponse), blockLabel); # a list of which each element is index set of one block
-		mpi.bcast.Robj2slave(x.train, comm = mpiComm);
-		mpi.bcast.Robj2slave(y.train, comm = mpiComm);
-		mpi.bcast.Robj2slave(x.test, comm = mpiComm);
-		mpi.bcast.Robj2slave(allowed, comm = mpiComm);
-		mpi.bcast.Robj2slave(bartRobust, comm = mpiComm);
-		try(mpi.bcast.Rfun2slave(comm = mpiComm));
-		environment(applicand) <- globalenv(); # very important, so function applicand broadcasted to other mpi processes will read variables from their global environments instead of bringing this environment with it
-		for (i in seq(nBlock)) {
-			if (verbose) print(paste(i, "/", nBlock));
-			bartedList <- c(bartedList, mpi.apply(blockIxList[[i]], applicand, simplify = simplify, verbose = pmax(verbose - 1, 0), comm = mpiComm, ...));
-			if (!missing(saveTo) && !is.null(saveTo)) save(bartedList, file = saveTo);
-		}
+
+	registerDoMC(blockSize)
+
+	tempSeqs = sequence(nResponse)
+	bartedList = foreach(i = tempSeqs) %dopar% {
+		if (verbose) print(paste(i, "/", nResponse, responseName[i]));
+		applicand(i, simplify = simplify, verbose = pmax(verbose - 1, 0), ...)
 	}
-	names(bartedList) <- responseName;
+
+	names(bartedList) <- responseName
 	bartedList <- lapply(bartedList, as.list); # in case one bart call returns an error message, the error message will be covnerted to a list
-	if (!missing(saveTo) && !is.null(saveTo)) save(bartedList, file = saveTo);
+	if (!is.null(saveTo)) save(bartedList, file = saveTo);
 	if (simplify) { # simplify results
 		result$yMean <- cbindCountingNull(lapply(bartedList, "[[", "yMean"));
 		result$yMeanVar <- cbindCountingNull(lapply(bartedList, "[[", "yMeanVar"));
@@ -263,7 +248,6 @@ cbindCountingNull <- function(colList, default = NA) { # column-binding elements
 	combined;
 }
 
-save.image();
 
 # formating input arguments
 argStringList <- commandArgs()[7:length(commandArgs())]
@@ -294,9 +278,6 @@ regMat[availableTfName, ] <- TRUE; # only allow a target to be regulated by TFs 
 regMat[cbind(availableTfName, availableTfName)] <- FALSE; # disallow autoregulation
 
 if (!is.null(argList$saveTo)) saveProcessTo <- paste(argList$saveTo, ".bartProcess.RData", sep = "") else saveProcessTo <- NULL;
-if (!is.null(argList$useMpi))
-	if (argList$useMpi)
-		mpiComm <- 1 else mpiComm <- NULL;
 if (!is.null(argList$mpiBlockSize))
 	if (argList$mpiBlockSize)
 		mpiBlockSize <- argList$mpiBlockSize else mpiBlockSize <- 1; 
@@ -306,7 +287,6 @@ result <- getBartNetwork(
 	tgtLevel = tgtLevel,
 	tfLevel = tfLevel,
 	regMat = regMat,
-	mpiComm = mpiComm,
 	blockSize = mpiBlockSize, 
 	saveTo = saveProcessTo
 );

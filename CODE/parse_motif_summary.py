@@ -5,17 +5,21 @@ import argparse
 import glob
 import os.path
 import os
+import logging
+
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Summarize inferred FIRE motifs.")
     parser.add_argument('-i', '--dir_input', dest='dir_input', type=str)
     parser.add_argument('-o', '--fn_output', dest='fn_output', type=str)
     parser.add_argument('-a', '--append_mi_zscore_robustness', dest='append_mi_zscore_robustness', type=bool, default=True)
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
+
 def errprint(st):
-    sys.stderr.write(st + "\n")
+    logging.ERROR(st + "\n")
+
 
 def main(argv):
     parsed = parse_args(argv)
@@ -32,7 +36,8 @@ def main(argv):
         tf = os.path.basename(fn).strip('_FIRE')
         # parse FIRE summary file  
         fsum = fn + "/DNA/" + tf + ".summary"
-        if os.path.isfile(fsum) and os.stat(fsum).st_size > 0:
+
+        if os.path.isfile(fsum) and os.path.getsize(fsum) > 0:
             lines = open(fsum, "r").readlines()
             motif = lines[0].split('\t')[0]
             if parsed.append_mi_zscore_robustness:
@@ -44,5 +49,6 @@ def main(argv):
                 writer.write("%s\t%s\n" % (tf, motif))
     writer.close()
 
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])

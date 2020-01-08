@@ -1,18 +1,22 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 import sys
 import os
 import argparse
+import logging
+
 
 def parse_args(argv):
     parser = argparse.ArgumentParser(description="Convert motif infered from FIRE to MEME format")
     parser.add_argument('-i', '--fn_input', dest='fn_input', type=str)
     parser.add_argument('-o', '--dir_output', dest='dir_output', type=str)
-    parsed = parser.parse_args(argv[1:])
+    parsed = parser.parse_args(argv)
     return parsed
 
+
 def errprint(st):
-    sys.stderr.write(st + "\n")
+    logging.ERROR(st + "\n")
+
 
 def main(argv):
     parsed = parse_args(argv)
@@ -76,5 +80,6 @@ def main(argv):
             writer.write("\n")
         writer.close()
 
+
 if __name__ == "__main__":
-    main(sys.argv)
+    main(sys.argv[1:])
